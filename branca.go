@@ -151,6 +151,7 @@ func (b *Branca) DecodeToString(data string) (string, error) {
 	return payloadString, nil
 }
 
+// Token holds the timestamp and payload of a decoded branca token
 type Token struct {
 	Timestamp time.Time
 	Payload string
