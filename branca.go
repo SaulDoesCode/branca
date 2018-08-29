@@ -199,7 +199,7 @@ func (b *Branca) DecodeToken(data string) (Token, error) {
 		future := int64(timestamp + b.ttl)
 		now := time.Now().Unix()
 		if future < now {
-			return token, ErrExpiredToken
+			return Tkn, ErrExpiredToken
 		}
 		Tkn.Timestamp = time.Unix(int64(timestamp), 0)
 	}
