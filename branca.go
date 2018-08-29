@@ -159,18 +159,18 @@ type Token struct {
 
 // DecodeToken decode token and return Token struct containing the timestamp and payload if valid
 func (b *Branca) DecodeToken(data string) (Token, error) {
-	token := Token{}
+	Tkn := Token{}
 
 	if len(data) < 62 {
-		return token, ErrInvalidToken
+		return Tkn, ErrInvalidToken
 	}
 	base62, err := basex.NewEncoding(base62)
 	if err != nil {
-		return token, ErrInvalidToken
+		return Tkn, ErrInvalidToken
 	}
 	token, err := base62.Decode(data)
 	if err != nil {
-		return token, ErrInvalidToken
+		return Tkn, ErrInvalidToken
 	}
 	header := token[0:29]
 	ciphertext := token[29:]
@@ -179,19 +179,21 @@ func (b *Branca) DecodeToken(data string) (Token, error) {
 	nonce := header[5:]
 
 	if tokenversion != version {
-		return token, ErrInvalidTokenVersion
+		return Tkn, ErrInvalidTokenVersion
 	}
 
 	key := bytes.NewBufferString(b.Key).Bytes()
 
 	xchacha, err := chacha20poly1305.NewX(key)
 	if err != nil {
-		return token, ErrBadKeyLength
+		return Tkn, ErrBadKeyLength
 	}
 	payload, err := xchacha.Open(nil, nonce, ciphertext, header)
 	if err != nil {
-		return token, err
+		return Tkn, err
 	}
+	
+	Tkn.Payload = bytes.NewBuffer(payload).String()
 
 	if b.ttl != 0 {
 		future := int64(timestamp + b.ttl)
@@ -199,9 +201,8 @@ func (b *Branca) DecodeToken(data string) (Token, error) {
 		if future < now {
 			return token, ErrExpiredToken
 		}
-		token.Timestamp = time.Unix(int64(timestamp), 0)
+		Tkn.Timestamp = time.Unix(int64(timestamp), 0)
 	}
 
-	token.Payload = bytes.NewBuffer(payload).String()
-	return token, nil
+	return Tkn, nil
 }
