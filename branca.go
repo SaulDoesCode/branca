@@ -151,7 +151,7 @@ func (b *Branca) DecodeToString(data string) (string, error) {
 	return payloadString, nil
 }
 
-type struct Token {
+type Token struct {
 	Timestamp time.Time
 	Payload string
 }
@@ -201,6 +201,6 @@ func (b *Branca) DecodeToken(data string) (Token, error) {
 		token.Timestamp = time.Unix(int64(timestamp), 0)
 	}
 
-	token.Payload := bytes.NewBuffer(payload).String()
+	token.Payload = bytes.NewBuffer(payload).String()
 	return token, nil
 }
