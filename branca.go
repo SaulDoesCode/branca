@@ -158,7 +158,7 @@ type Token struct {
 
 // DecodeToken decode token and return Token struct containing the timestamp and payload if valid
 func (b *Branca) DecodeToken(data string) (Token, error) {
-	token = Token{}
+	token := Token{}
 
 	if len(data) < 62 {
 		return token, ErrInvalidToken
