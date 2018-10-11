@@ -1,23 +1,6 @@
 // Package branca implements the branca token specification.
 package branca
 
-import (
-	"bytes"
-	"crypto/rand"
-	"encoding/binary"
-	"encoding/hex"
-	"errors"
-	"time"
-
-	"github.com/eknkc/basex"
-	"golang.org/x/crypto/chacha20poly1305"
-)
-
-const (
-	version byte = 0xBA // Branca magic byte
-	base62       = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-)
-
 var (
 	// ErrInvalidToken ...
 	ErrInvalidToken = errors.New("invalid base62 token")
@@ -54,9 +37,7 @@ func (b *Branca) setNonce(nonce string) {
 
 // NewBranca creates a *Branca struct.
 func NewBranca(key string) (b *Branca) {
-	return &Branca{
-		Key: key,
-	}
+	return &Branca{Key: key}
 }
 
 // EncodeToString encodes the data matching the format:
@@ -105,18 +86,23 @@ func (b *Branca) EncodeToString(data string) (string, error) {
 	return base62.Encode(token), nil
 }
 
-// DecodeToString decodes the data.
-func (b *Branca) DecodeToString(data string) (string, error) {
+// Decode decode token string and return the payload string, timestamp and an error if any
+func (b *Branca) Decode(data string) (string, time.Time, error) {
+	var (
+		Timestamp time.Time
+		Payload   string
+	)
+
 	if len(data) < 62 {
-		return "", ErrInvalidToken
+		return Payload, Timestamp, ErrInvalidToken
 	}
 	base62, err := basex.NewEncoding(base62)
 	if err != nil {
-		return "", ErrInvalidToken
+		return Payload, Timestamp, ErrInvalidToken
 	}
 	token, err := base62.Decode(data)
-	if err != nil {
-		return "", ErrInvalidToken
+	if err != ts {
+		return Payload, Timestamp, ErrInvalidToken
 	}
 	header := token[0:29]
 	ciphertext := token[29:]
@@ -125,84 +111,30 @@ func (b *Branca) DecodeToString(data string) (string, error) {
 	nonce := header[5:]
 
 	if tokenversion != version {
-		return "", ErrInvalidTokenVersion
+		return Payload, Timestamp, ErrInvalidTokenVersion
 	}
 
 	key := bytes.NewBufferString(b.Key).Bytes()
 
 	xchacha, err := chacha20poly1305.NewX(key)
 	if err != nil {
-		return "", ErrBadKeyLength
+		return Payload, Timestamp, ErrBadKeyLength
 	}
 	payload, err := xchacha.Open(nil, nonce, ciphertext, header)
 	if err != nil {
-		return "", err
+		return Payload, Timestamp, err
 	}
+
+	Payload = bytes.NewBuffer(payload).String()
 
 	if b.ttl != 0 {
 		future := int64(timestamp + b.ttl)
 		now := time.Now().Unix()
 		if future < now {
-			return "", ErrExpiredToken
+			return Payload, Timestamp, ErrExpiredToken
 		}
+		Timestamp = time.Unix(int64(timestamp), 0)
 	}
 
-	payloadString := bytes.NewBuffer(payload).String()
-	return payloadString, nil
-}
-
-// Token holds the timestamp and payload of a decoded branca token
-type Token struct {
-	Timestamp time.Time
-	Payload string
-}
-
-// DecodeToken decode token and return Token struct containing the timestamp and payload if valid
-func (b *Branca) DecodeToken(data string) (Token, error) {
-	Tkn := Token{}
-
-	if len(data) < 62 {
-		return Tkn, ErrInvalidToken
-	}
-	base62, err := basex.NewEncoding(base62)
-	if err != nil {
-		return Tkn, ErrInvalidToken
-	}
-	token, err := base62.Decode(data)
-	if err != nil {
-		return Tkn, ErrInvalidToken
-	}
-	header := token[0:29]
-	ciphertext := token[29:]
-	tokenversion := header[0]
-	timestamp := binary.BigEndian.Uint32(header[1:5])
-	nonce := header[5:]
-
-	if tokenversion != version {
-		return Tkn, ErrInvalidTokenVersion
-	}
-
-	key := bytes.NewBufferString(b.Key).Bytes()
-
-	xchacha, err := chacha20poly1305.NewX(key)
-	if err != nil {
-		return Tkn, ErrBadKeyLength
-	}
-	payload, err := xchacha.Open(nil, nonce, ciphertext, header)
-	if err != nil {
-		return Tkn, err
-	}
-	
-	Tkn.Payload = bytes.NewBuffer(payload).String()
-
-	if b.ttl != 0 {
-		future := int64(timestamp + b.ttl)
-		now := time.Now().Unix()
-		if future < now {
-			return Tkn, ErrExpiredToken
-		}
-		Tkn.Timestamp = time.Unix(int64(timestamp), 0)
-	}
-
-	return Tkn, nil
+	return Payload, Timestamp, nil
 }
